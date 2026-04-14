@@ -120,11 +120,23 @@ def plot_pr(y_true, y_proba, title='', ax=None):
 
 def compute_metrics(y_true, y_pred, y_proba):
     return {
-        "accuracy"  : accuracy(y_true, y_pred),
-        "precision" : precision(y_true, y_pred),
-        "recall"    : recall(y_true, y_pred),
-        "f1"        : f1(y_true, y_pred),
-        "auc_roc"   : auc_roc(y_true, y_proba),
-        "auc_pr"    : auc_pr(y_true, y_proba),
+        "accuracy": accuracy(y_true, y_pred),
+        "precision": precision(y_true, y_pred),
+        "recall": recall(y_true, y_pred),
+        "f1": f1(y_true, y_pred),
+        "auc_roc": auc_roc(y_true, y_proba),
+        "auc_pr": auc_pr(y_true, y_proba),
     }
 
+def compute_metrics_multiclass(y_true, y_pred, y_proba):
+    classes = np.unique(y_true)
+    metrics = {}
+
+    for k in classes:
+        y_true_k = (y_true == k).astype(int)
+        y_pred_k = (y_pred == k).astype(int)
+        y_proba_k = y_proba[:, k]
+
+        metrics[k] = compute_metrics(y_true_k, y_pred_k, y_proba_k)
+
+    return metrics
