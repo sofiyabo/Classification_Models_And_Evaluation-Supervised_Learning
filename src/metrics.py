@@ -42,7 +42,8 @@ def auc(x, y):
 
 def precision_recall_curve(y_true, y_proba):
     thresholds = np.linspace(0, 1, 200)
-    precisions, recalls = [], []
+    precisions = []
+    recalls = []
     for t in thresholds:
         y_pred = (y_proba >= t).astype(int)
         precisions.append(precision(y_true, y_pred))
@@ -73,3 +74,57 @@ def plot_roc(y_true, y_proba, title=''):
 
     plt.tight_layout()
     plt.show()
+
+def f1(y_true, y_pred):
+    p = precision(y_true, y_pred)
+    r = recall(y_true, y_pred)
+    return 2 * p * r / (p + r) if (p + r) > 0 else 0.0
+
+def auc_roc(y_true, y_proba):
+    fprs, tprs = roc_curve(y_true, y_proba)
+    return auc(fprs, tprs)  # integra tpr sobre fpr
+
+
+def auc_pr(y_true, y_proba):
+    precs, recs = precision_recall_curve(y_true, y_proba)
+    return auc(recs, precs)  # integra precision sobre recall
+
+def plot_confusion_matrix(y_true, y_pred, ax=None):
+    if ax is None:
+        _, ax = plt.subplots()
+    cm = confusion_matrix(y_true, y_pred)
+    im = ax.imshow(cm, cmap="Blues")
+    ax.set_xticks([0, 1]); ax.set_xticklabels(["Pred 0", "Pred 1"])
+    ax.set_yticks([0, 1]); ax.set_yticklabels(["Real 0", "Real 1"])
+    for i in range(2):
+        for j in range(2):
+            ax.text(j, i, str(cm[i, j]), ha="center", va="center", fontsize=12)
+    ax.set_title("Confusion Matrix")
+    plt.colorbar(im, ax=ax)
+    return ax
+
+def plot_pr(y_true, y_proba, title='', ax=None):
+    if ax is None:
+        _, ax = plt.subplots()
+    recalls, precisions = precision_recall_curve(y_true, y_proba)
+    auc = auc_pr(y_true, y_proba)
+    baseline = y_true.mean()
+    ax.plot(recalls, precisions, label=f"AUC-PR = {auc:.3f}")
+    ax.axhline(baseline, color="k", linestyle="--", label=f"Baseline = {baseline:.3f}")
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
+    ax.set_title(f"Precision-Recall Curve {title}")
+    ax.legend()
+    return ax
+
+
+def compute_metrics(y_true, y_pred, y_proba):
+    return {
+        "accuracy"  : accuracy(y_true, y_pred),
+        "precision" : precision(y_true, y_pred),
+        "recall"    : recall(y_true, y_pred),
+        "f1"        : f1(y_true, y_pred),
+        "auc_roc"   : auc_roc(y_true, y_proba),
+        "auc_pr"    : auc_pr(y_true, y_proba),
+    }
+

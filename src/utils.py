@@ -111,3 +111,17 @@ def plot_school_analysis(df, feats_numericas, label_rend, label_sem):
     ax.legend(title='Rendimiento', bbox_to_anchor=(1.01, 1), loc='upper left')
     plt.tight_layout()
     plt.show()
+
+
+def cv(folds, model_fn, preprocess_fn, metrics_fn):
+    all_metrics = []
+
+    for fold in folds:
+        df_train, df_val = fold
+
+        X_train, y_train, X_val, y_val = preprocess_fn(df_train, df_val)
+        model   = model_fn(X_train, y_train)
+        metrics = metrics_fn(model, X_val, y_val)
+        all_metrics.append(metrics)
+
+    return all_metrics

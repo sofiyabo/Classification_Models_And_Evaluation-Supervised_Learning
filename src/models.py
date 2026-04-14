@@ -1,9 +1,9 @@
 import numpy as np
 
 class LogRegressionL2:
-    def __init__(self, lr=0.01, lambda_=1.0, n_iter=1000):
+    def __init__(self, lr=0.01, lam=1.0, n_iter=1000):
         self.lr = lr
-        self.lambda_ = lambda_
+        self.lambda_ = lam
         self.n_iter = n_iter
         self.weights = None
         self.bias = None
@@ -20,7 +20,7 @@ class LogRegressionL2:
             z = X @ self.weights + self.bias
             y_pred = self.sigmoid(z)
 
-            dw = (1 / n_samples) * (X.T @ (y_pred - y)) + (self.lambda_ / n_samples) * self.weights #cross entropy loss + grad con L2
+            dw = (1 / n_samples) * (X.T @ (y_pred - y)) + self.lambda_ * self.weights
             db = (1 / n_samples) * np.sum(y_pred - y)
 
             self.weights -= self.lr * dw
@@ -30,4 +30,4 @@ class LogRegressionL2:
             return self.sigmoid(X @ self.weights + self.bias)
     
     def predict(self, X, threshold=0.5):
-        return (self.predict_proba(X) >= threshold).astype(int)
+        return (self.predict_prob(X) >= threshold).astype(int)
