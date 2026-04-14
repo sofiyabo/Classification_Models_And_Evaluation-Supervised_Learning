@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import preprocessing as prep
 import models as mdls
 import metrics as mtr
+import utils as utls
 
 
 def random_split(df, train_split = 0.8):
@@ -26,11 +27,9 @@ def random_split(df, train_split = 0.8):
 
 def group_split(df, val_schools):
 
-
     mask_val = df["escuela"].isin(val_schools)
     df_train = df[~mask_val].reset_index(drop=True)
     df_val   = df[ mask_val].reset_index(drop=True)
-
 
     return df_train, df_val
 
@@ -85,25 +84,26 @@ def group_kfold(df, k=8):
 def cv_lambda_random(df, feature_cols, target_col, feats_imp, exclude, lambdas, k=5, random_state=42):
 
     folds = random_kfold(df, target_col=target_col, k=k, random_state=random_state)
+    
     f1_lambdas = []
 
     for lam in lambdas:
         f1_folds = []
 
         for df_train, df_val in folds:
-            meds     = prep.medians(df_train, feats_imp)
+            meds = prep.medians(df_train, feats_imp)
             df_train = prep.impute(df_train, meds, feats_imp)
-            df_val   = prep.impute(df_val,   meds, feats_imp)
-            params   = prep.params_norm(df_train, exclude)
+            df_val = prep.impute(df_val,   meds, feats_imp)
+            params  = prep.params_norm(df_train, exclude)
             df_train = prep.normalize_df(df_train, params)
-            df_val   = prep.normalize_df(df_val,   params)
+            df_val = prep.normalize_df(df_val,   params)
 
             X_train = df_train[feature_cols].values
             y_train = df_train[target_col].values
-            X_val   = df_val[feature_cols].values
-            y_val   = df_val[target_col].values
+            X_val = df_val[feature_cols].values
+            y_val = df_val[target_col].values
 
-            model   = mdls.LogRegressionL2(lam=lam)
+            model = mdls.LogRegressionL2(lam=lam)
             model.set_model(X_train, y_train)
             y_pred  = model.predict(X_val)
 
@@ -159,3 +159,43 @@ def plot_lambda_search(lambdas, f1_random, f1_group, f1_temporal):
     ax.legend()
     plt.tight_layout()
     plt.show()
+
+def cv_coeficientes_random(df, feature_cols, target_col, feats_imp, exclude, lam, k=5):
+    folds = random_kfold(df, target_col=target_col, k=k)  # df, no indices
+    coefs = []
+
+    for df_train, df_val in folds:
+        meds     = prep.medians(df_train, feats_imp)
+        df_train = prep.impute(df_train, meds, feats_imp)
+        df_val   = prep.impute(df_val,   meds, feats_imp)
+        params   = prep.params_norm(df_train, exclude)
+        df_train = prep.normalize_df(df_train, params)
+
+        X_train = df_train[feature_cols].values
+        y_train = df_train[target_col].values
+
+        model = mdls.LogRegressionL2(lam=lam)
+        model.set_model(X_train, y_train)
+        coefs.append(model.weights.copy())  # weights, no coef_
+
+    return np.array(coefs)  # shape (k, n_features)
+
+
+def cv_coeficientes_group(df, feature_cols, target_col, feats_imp, exclude, lam, k=8):
+    folds = group_kfold(df, k=k)  # df, no groups
+    coefs = []
+
+    for df_train, df_val, _ in folds:  # unpack los 3 valores
+        meds     = prep.medians(df_train, feats_imp)
+        df_train = prep.impute(df_train, meds, feats_imp)
+        params   = prep.params_norm(df_train, exclude)
+        df_train = prep.normalize_df(df_train, params)
+
+        X_train = df_train[feature_cols].values
+        y_train = df_train[target_col].values
+
+        model = mdls.LogRegressionL2(lam=lam)
+        model.set_model(X_train, y_train)
+        coefs.append(model.weights.copy())
+
+    return np.array(coefs)  # shape (k, n_features)

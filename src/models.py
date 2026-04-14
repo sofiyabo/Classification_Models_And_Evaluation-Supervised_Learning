@@ -1,7 +1,7 @@
 import numpy as np
 
 class LogRegressionL2:
-    def __init__(self, lr=0.01, lam=1.0, n_iter=1000):
+    def __init__(self, lr=0.01, lam=0.1, n_iter=1000):
         self.lr = lr
         self.lambda_ = lam
         self.n_iter = n_iter

@@ -125,3 +125,10 @@ def cv(folds, model_fn, preprocess_fn, metrics_fn):
         all_metrics.append(metrics)
 
     return all_metrics
+
+def matrices(df, feature_cols, target):
+    
+    X = df[feature_cols].values
+    y = df[target].values
+    return X, y
+
