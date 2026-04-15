@@ -64,3 +64,64 @@ def normalize_df(df, params):
             df[col] = 0.0
     return df
 
+def undersampling(X, y):
+    #separo los indices de la clase mayoritaria (1) y la minoritaria (0)
+    idx_may = np.where(y == 1)[0]
+    idx_min = np.where(y == 0)[0]
+
+    #me quedo con la misma cantidad de clase 1 que de clase 0, eligiendolos de manera random
+    idx_may_sub = np.random.choice(idx_may, size=len(idx_min), replace=False)
+
+    indexes = np.concatenate([idx_may_sub, idx_min]) #uno todos los indices
+    np.random.shuffle(indexes)  # mezclar los indices para no tener todas las clases juntas
+
+    return X[indexes], y[indexes]
+
+def oversampling_dup(X, y):
+    idx_may = np.where(y == 1)[0]
+    idx_min = np.where(y == 0)[0]
+
+    # ir duplicando datos de la clase minoritaria de manera random hasta llegar a la misma cantidad que la mayoritaria
+    n = len(idx_may) - len(idx_min)
+    idx_min_dup = np.random.choice(idx_min, size=n, replace=True)
+
+    indexes = np.concatenate([idx_may, idx_min, idx_min_dup])
+    np.random.shuffle(indexes)
+
+    return X[indexes], y[indexes]
+
+def smote(X, y, k_neighbors=5):
+    idx_may = np.where(y == 1)[0]
+    idx_min = np.where(y == 0)[0]
+    X_min = X[idx_min]
+
+    n= len(idx_may) - len(idx_min)
+    
+    synthetic = []
+
+    for _ in range(n):
+        # muestra aleatoria de la clase minoritaria
+        idx = np.random.randint(0, len(X_min))
+        muestra = X_min[idx]
+
+        # k vecinos mas cercanos, de la misma clase
+        dists = np.linalg.norm(X_min - muestra, axis=1)
+        dists[idx] = np.inf  # excluir la muestra misma
+        vecinos_idx = np.argsort(dists)[:k_neighbors]
+
+        # elegir un vecino aleatorio
+        vecino = X_min[np.random.choice(vecinos_idx)]
+
+        #interpolar
+        alpha = np.random.uniform(0, 1)
+        new = muestra + alpha * (vecino - muestra)
+        synthetic.append(new)
+
+    X_synthetic = np.array(synthetic)
+    y_synthetic = np.ones(n, dtype=int) * 0  # pongo ceros porque la clase minoritaria es desaprobado (0)
+
+    X_b = np.vstack([X[idx_may], X[idx_min], X_synthetic])
+    y_b = np.concatenate([y[idx_may], y[idx_min], y_synthetic])
+
+    idx_shuffle = np.random.permutation(len(y_b))
+    return X_b[idx_shuffle], y_b[idx_shuffle]

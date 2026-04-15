@@ -11,20 +11,26 @@ class LogRegressionL2:
     def sigmoid(self, z):
         return 1 / (1 + np.exp(-z))
     
-    def set_model(self, X, y):
+    def set_model(self, X, y, w = None):
         n_samples, n_features = X.shape
 
         self.weights = np.zeros(n_features)
         self.bias = 0.0
+
+        if w is None:
+            w = np.ones(n_samples) # hace que sino se ponen pesos, w sea lo mismo que multiplicar por 1
+        
+        w = w / w.sum() * n_samples
+        
         for i in range(self.n_iter):
             z = X @ self.weights + self.bias
             y_pred = self.sigmoid(z)
 
-            dw = (1 / n_samples) * (X.T @ (y_pred - y)) + self.lambda_ * self.weights
-            db = (1 / n_samples) * np.sum(y_pred - y)
+            dw = (1 / n_samples) * (X.T @ (w *(y_pred - y))) + self.lambda_ * self.weights
+            db = (1 / n_samples) * np.sum(w * (y_pred - y))
 
             self.weights -= self.lr * dw
-            self.bias    -= self.lr * db
+            self.bias -= self.lr * db
         
     def predict_prob(self, X): # para las metricas que necesitan scores continuos (las curvas)
             return self.sigmoid(X @ self.weights + self.bias)
@@ -89,7 +95,7 @@ class LDA:
         probs = self.predict_prob(X)
         i = np.argmax(probs, axis=1)
         return self.classes[i]
-    
+
 
 class LogRegressionMulticlass:
     def __init__(self, lr=0.01, lam=0.5, n_iter=1000):
@@ -150,12 +156,12 @@ class DecisionTree:
         self.tree = None
         self.classes = None
 
-    def entropy(self, y):
+    def entropy(self, y): #mide cuan mezcladas estan las clases, el arbol busca minimizarla
         classes, counts = np.unique(y, return_counts=True)
         probs = counts / len(y)
         return -np.sum(probs * np.log2(probs + 1e-10))
 
-    def best_split(self, X, y):
+    def best_split(self, X, y): #elige el mejor corte probando cada threshold para todas las features
         n_samples, n_features = X.shape
         best_gain = -1
         best_feat = None
@@ -169,12 +175,13 @@ class DecisionTree:
 
         for feat in feat_idx:
             thresholds = np.unique(X[:, feat])
+            if len(thresholds) > 10:
+                thresholds = np.percentile(X[:, feat], np.linspace(10, 90, 10))
             for thresh in thresholds:
                 left  = y[X[:, feat] <= thresh]
                 right = y[X[:, feat] >  thresh]
 
-                if len(left) < self.min_samples_leaf or \
-                   len(right) < self.min_samples_leaf:
+                if len(left) < self.min_samples_leaf or len(right) < self.min_samples_leaf:
                     continue
 
                 gain = parent_entropy \
@@ -182,11 +189,11 @@ class DecisionTree:
                      - (len(right) / n_samples) * self.entropy(right)
 
                 if gain > best_gain:
-                    best_gain   = gain
-                    best_feat   = feat
+                    best_gain = gain
+                    best_feat = feat
                     best_thresh = thresh
 
-        return best_feat, best_thresh
+        return best_feat, best_thresh, best_gain #devuelve la mejor feature, el mejor threshold 
 
     def build_tree(self, X, y, depth=0):
         # Condiciones de parada
@@ -200,7 +207,7 @@ class DecisionTree:
                 probs[idx] = c / len(y)
             return {"leaf": True, "probs": probs}
 
-        feat, thresh = self.best_split(X, y)
+        feat, thresh, gain = self.best_split(X, y)
 
         if feat is None:
             classes, counts = np.unique(y, return_counts=True)
@@ -214,11 +221,13 @@ class DecisionTree:
         right_mask = ~left_mask
 
         return {
-            "leaf"   : False,
-            "feat"   : feat,
-            "thresh" : thresh,
-            "left"   : self.build_tree(X[left_mask],  y[left_mask],  depth+1),
-            "right"  : self.build_tree(X[right_mask], y[right_mask], depth+1)
+            "leaf"     : False,
+            "feat"     : feat,
+            "thresh"   : thresh,
+            "gain"     : gain,
+            "n_samples": len(y), 
+            "left"     : self.build_tree(X[left_mask],  y[left_mask],  depth+1),
+            "right"    : self.build_tree(X[right_mask], y[right_mask], depth+1)
         }
 
     def set_model(self, X, y):
@@ -242,13 +251,13 @@ class DecisionTree:
 
 
 class RandomForest:
-    def __init__(self, n_estimators=100, max_depth=None, min_samples_leaf=1, max_features=None):
-        self.n_estimators     = n_estimators
-        self.max_depth        = max_depth
+    def __init__(self, n_estimators=30, max_depth=12, min_samples_leaf=10, max_features=6):
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
-        self.max_features     = max_features
-        self.trees            = []
-        self.classes          = None
+        self.max_features = max_features
+        self.trees = []
+        self.classes = None
 
     def set_model(self, X, y):
         self.classes = np.unique(y)
@@ -256,7 +265,7 @@ class RandomForest:
         self.trees = []
 
         for _ in range(self.n_estimators):
-            # Bootstrap
+            #Bootstrap: cada arbol ve aporx 63% de los datos
             idx = np.random.choice(len(y), size=len(y), replace=True)
             X_b = X[idx]
             y_b = y[idx]
@@ -280,29 +289,31 @@ class RandomForest:
         indices = np.argmax(probs, axis=1)
         return self.classes[indices]
 
-    def feature_importance(self):
-
-        n_features   = self.trees[0].tree["feat"] if not self.trees[0].tree["leaf"] else 0
-        importances  = np.zeros(max(
-            max(self._get_features(t.tree)) + 1 for t in self.trees))
+    def feature_importance(self): #como en cada node se elige la feature que minimiza la entropia, si una feature fue elegida muchas veces, es una feature muy importante
+        n_features  = len(set(self._get_features(self.trees[0].tree)))
+        importances = np.zeros(n_features)
 
         for tree in self.trees:
-            self._compute_importance(tree.tree, importances)
+            n_samples = tree.tree["n_samples"]  # total de muestras del árbol
+            self._compute_importance(tree.tree, importances, n_samples) # la importancia de una feature es la suma de las importancia de todos los nodos en los que se eligio esa feature
 
-        importances /= len(self.trees)
-        importances /= importances.sum() if importances.sum() > 0 else 1
+        # los nodos son importantes segun el nivel en el que se encuentren, ya que cuanto mas arriba, tienen en consideracion mas datos
+        importances /= len(self.trees) # se promedian la importancia de las features sobre todos los arboles
+        total = importances.sum()
+        if total > 0:
+            importances /= total
         return importances
-
+    
     def _get_features(self, node):
         if node["leaf"]:
             return [0]
         return [node["feat"]] + self._get_features(node["left"]) \
                               + self._get_features(node["right"])
 
-    def _compute_importance(self, node, importances):
+    def _compute_importance(self, node, importances, n_samples):
         if node["leaf"]:
             return
-        importances[node["feat"]] += 1
-        self._compute_importance(node["left"],  importances)
-        self._compute_importance(node["right"], importances)
+        importances[node["feat"]] += node["gain"] * (node["n_samples"] / n_samples)
+        self._compute_importance(node["left"],  importances, n_samples)
+        self._compute_importance(node["right"], importances, n_samples)
 

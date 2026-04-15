@@ -43,13 +43,25 @@ def auc(x, y):
 def precision_recall_curve(y_true, y_proba):
     thresholds = np.linspace(0, 1, 200)
     precisions = []
-    recalls = []
+    recalls    = []
+
     for t in thresholds:
         y_pred = (y_proba >= t).astype(int)
         precisions.append(precision(y_true, y_pred))
         recalls.append(recall(y_true, y_pred))
-    return np.array(precisions), np.array(recalls)
 
+    precisions = np.array(precisions)
+    recalls    = np.array(recalls)
+
+    # Ordenar por recall creciente
+    orden      = np.argsort(recalls)
+    recalls    = recalls[orden]
+    precisions = precisions[orden]
+
+    auc_val = np.trapz(precisions, recalls)
+    return precisions, recalls, auc_val
+
+"""
 def plot_roc(y_true, y_proba, title=''):
     fprs, tprs = roc_curve(y_true, y_proba)
     auc_roc = auc(fprs, tprs)
@@ -74,7 +86,7 @@ def plot_roc(y_true, y_proba, title=''):
 
     plt.tight_layout()
     plt.show()
-
+"""
 def f1(y_true, y_pred):
     p = precision(y_true, y_pred)
     r = recall(y_true, y_pred)
@@ -89,6 +101,8 @@ def auc_pr(y_true, y_proba):
     precs, recs = precision_recall_curve(y_true, y_proba)
     return auc(recs, precs)  # integra precision sobre recall
 
+
+"""
 def plot_confusion_matrix(y_true, y_pred, ax=None):
     if ax is None:
         _, ax = plt.subplots()
@@ -140,3 +154,6 @@ def compute_metrics_multiclass(y_true, y_pred, y_proba):
         metrics[k] = compute_metrics(y_true_k, y_pred_k, y_proba_k)
 
     return metrics
+
+    """
+

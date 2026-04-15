@@ -6,6 +6,7 @@ import preprocessing as prep
 import models as mdls
 import metrics as mtr
 import utils as utls
+import itertools
 
 
 def random_split(df, train_split = 0.8):
@@ -91,12 +92,7 @@ def cv_lambda_random(df, feature_cols, target_col, feats_imp, exclude, lambdas, 
         f1_folds = []
 
         for df_train, df_val in folds:
-            meds = prep.medians(df_train, feats_imp)
-            df_train = prep.impute(df_train, meds, feats_imp)
-            df_val = prep.impute(df_val, meds, feats_imp)
-            params  = prep.params_norm(df_train, exclude)
-            df_train = prep.normalize_df(df_train, params)
-            df_val = prep.normalize_df(df_val, params)
+            df_train, df_val = utls.pipeline(df_train, df_val, feats_imp, exclude)
 
             X_train = df_train[feature_cols].values
             y_train = df_train[target_col].values
@@ -123,12 +119,7 @@ def cv_lambda_group(df, feature_cols, target_col, feats_imp, exclude, lambdas, k
         f1_folds = []
 
         for df_train, df_val, _ in folds:
-            meds = prep.medians(df_train, feats_imp)
-            df_train = prep.impute(df_train, meds, feats_imp)
-            df_val = prep.impute(df_val, meds, feats_imp)
-            params = prep.params_norm(df_train, exclude)
-            df_train = prep.normalize_df(df_train, params)
-            df_val = prep.normalize_df(df_val,params)
+            df_train, df_val = utls.pipeline(df_train, df_val, feats_imp, exclude)
 
             X_train = df_train[feature_cols].values
             y_train = df_train[target_col].values
@@ -165,11 +156,7 @@ def cv_coeficientes_random(df, feature_cols, target_col, feats_imp, exclude, lam
     coefs = []
 
     for df_train, df_val in folds:
-        meds     = prep.medians(df_train, feats_imp)
-        df_train = prep.impute(df_train, meds, feats_imp)
-        df_val   = prep.impute(df_val,   meds, feats_imp)
-        params   = prep.params_norm(df_train, exclude)
-        df_train = prep.normalize_df(df_train, params)
+        df_train, df_val = utls.pipeline(df_train, df_val, feats_imp, exclude)
 
         X_train = df_train[feature_cols].values
         y_train = df_train[target_col].values
@@ -205,17 +192,12 @@ def cv_group_multiclass(df, feature_cols, target_col, feats_imp, exclude, model_
     folds = group_kfold(df, k=k)
 
     all_preds = []
-    all_probas = []
+    all_probs = []
     all_true = []
 
     for df_train, df_val, _ in folds:
         # Preprocesamiento dentro del fold
-        meds = prep.medians(df_train, feats_imp)
-        df_train = prep.impute(df_train, meds, feats_imp)
-        df_val = prep.impute(df_val,   meds, feats_imp)
-        params = prep.params_norm(df_train, exclude)
-        df_train = prep.normalize_df(df_train, params)
-        df_val = prep.normalize_df(df_val,   params)
+        df_train, df_val = utls.pipeline(df_train, df_val, feats_imp, exclude)
 
         X_train = df_train[feature_cols].values
         y_train = df_train[target_col].values
@@ -225,11 +207,94 @@ def cv_group_multiclass(df, feature_cols, target_col, feats_imp, exclude, model_
         model.set_model(X_train, y_train)
 
         all_preds.append(model.predict(X_val))
-        all_probas.append(model.predict_prob(X_val))
+        all_probs.append(model.predict_prob(X_val))
         all_true.append(y_val)
 
     y_pred = np.concatenate(all_preds)
-    y_proba = np.vstack(all_probas)
+    y_prob = np.vstack(all_probs)
     y_true = np.concatenate(all_true)
 
-    return y_true, y_pred, y_proba
+    return y_true, y_pred, y_prob
+
+"""
+def cv_rf_hyperparams(df, feature_cols, target_col, feats_imp, exclude, param_grid, k=8):
+    folds = group_kfold(df, k=k)
+
+    keys         = list(param_grid.keys())
+    values       = list(param_grid.values())
+    combinations = list(itertools.product(*values))
+
+    results = []
+
+    for combo in combinations:
+        params   = dict(zip(keys, combo))
+        f1_folds = []
+
+        for df_train, df_val, _ in folds:
+            meds     = prep.medians(df_train, feats_imp)
+            df_train = prep.impute(df_train, meds, feats_imp)
+            df_val   = prep.impute(df_val,   meds, feats_imp)
+            p        = prep.params_norm(df_train, exclude)
+            df_train = prep.normalize_df(df_train, p)
+            df_val   = prep.normalize_df(df_val,   p)
+
+            X_train = df_train[feature_cols].values
+            y_train = df_train[target_col].values
+            X_val   = df_val[feature_cols].values
+            y_val   = df_val[target_col].values
+
+            model  = mdls.RandomForest(**params)
+            model.set_model(X_train, y_train)
+            y_pred = model.predict(X_val)
+
+            f1_macro = np.mean([
+                mtr.f1((y_val == k).astype(int), (y_pred == k).astype(int))
+                for k in np.unique(y_train)
+            ])
+            f1_folds.append(f1_macro)
+
+        results.append({**params, "f1_macro": np.mean(f1_folds)})
+        print(f"  {params} → F1 macro: {np.mean(f1_folds):.4f}")
+
+    results = sorted(results, key=lambda x: x["f1_macro"], reverse=True)
+    return results
+
+"""
+
+def cv_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lam, rebalanceo_fn=None, k=8, reweight = False):
+    folds  = group_kfold(df, k=k)
+    all_preds = []
+    all_probas = []
+    all_true = []
+
+    for df_train, df_val, _ in folds:
+        df_train, df_val = utls.pipeline(df_train, df_val, feats_imp, exclude)
+
+        X_train = df_train[feature_cols].values
+        y_train = df_train[target_col].values
+        X_val = df_val[feature_cols].values
+        y_val = df_val[target_col].values
+
+        model = mdls.LogRegressionL2(lam=lam)
+        
+        if rebalanceo_fn is not None:
+            X_train, y_train = rebalanceo_fn(X_train, y_train)
+            model.set_model(X_train, y_train)
+
+        elif reweight:
+
+            c1 = y_train.mean()      
+            c2 = 1 - c1               
+            C = c2 / c1
+
+            w = np.where(y_train == 0, C, 1.0)
+            model.set_model(X_train, y_train, w=w)
+
+        else:
+            model.set_model(X_train, y_train)
+
+        all_preds.append(model.predict(X_val))
+        all_probas.append(model.predict_prob(X_val))
+        all_true.append(y_val)
+
+    return np.concatenate(all_true), np.concatenate(all_preds), np.concatenate(all_probas)
