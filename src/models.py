@@ -151,7 +151,7 @@ class LogRegressionMulticlass:
 class DecisionTree:
     def __init__(self, max_depth=None, min_samples_leaf=1, max_features=None):
         self.max_depth = max_depth
-        self.min_samples_leaf = min_samples_leaf
+        self.min_samples_leaf = min_samples_leaf #evita que hayan splits con muy pocos datos
         self.max_features = max_features
         self.tree = None
         self.classes = None
@@ -167,7 +167,7 @@ class DecisionTree:
         best_feat = None
         best_thresh = None
 
-        # seleccion aleatoria de features (para Random Forest)
+        # seleccion aleatoria de features
         n_feats  = self.max_features or n_features
         feat_idx = np.random.choice(n_features, size=n_feats, replace=False)
 
@@ -188,25 +188,27 @@ class DecisionTree:
                      - (len(left)  / n_samples) * self.entropy(left) \
                      - (len(right) / n_samples) * self.entropy(right)
 
-                if gain > best_gain:
+                if gain > best_gain: #elige el par feature, threshold que maximiza la ganancia de info
                     best_gain = gain
                     best_feat = feat
                     best_thresh = thresh
 
         return best_feat, best_thresh, best_gain #devuelve la mejor feature, el mejor threshold 
 
-    def build_tree(self, X, y, depth=0):
-        # Condiciones de parada
+    def build_tree(self, X, y, depth=0): #construccion recursiva de arboles
+
+        #condiciones de parada
         if (self.max_depth is not None and depth >= self.max_depth) \
         or len(np.unique(y)) == 1 \
         or len(y) < 2 * self.min_samples_leaf:
-            classes, counts = np.unique(y, return_counts=True)
+            classes, counts = np.unique(y, return_counts=True) #si para se crea una hoja
             probs = np.zeros(len(self.classes))
             for k, c in zip(classes, counts):
                 idx = np.where(self.classes == k)[0][0]
                 probs[idx] = c / len(y)
             return {"leaf": True, "probs": probs}
 
+        #sino crea un nodo interno
         feat, thresh, gain = self.best_split(X, y)
 
         if feat is None:
@@ -289,7 +291,7 @@ class RandomForest:
         indices = np.argmax(probs, axis=1)
         return self.classes[indices]
 
-    def feature_importance(self): #como en cada node se elige la feature que minimiza la entropia, si una feature fue elegida muchas veces, es una feature muy importante
+    def feature_importance(self): #como en cada nodo se elige la feature que minimiza la entropia, si una feature fue elegida muchas veces, es una feature muy importante
         n_features  = len(set(self._get_features(self.trees[0].tree)))
         importances = np.zeros(n_features)
 

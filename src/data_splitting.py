@@ -6,7 +6,6 @@ import preprocessing as prep
 import models as mdls
 import metrics as mtr
 import utils as utls
-import itertools
 
 
 def random_split(df, train_split = 0.8):
@@ -30,7 +29,7 @@ def group_split(df, val_schools):
 
     mask_val = df["escuela"].isin(val_schools)
     df_train = df[~mask_val].reset_index(drop=True)
-    df_val   = df[ mask_val].reset_index(drop=True)
+    df_val = df[ mask_val].reset_index(drop=True)
 
     return df_train, df_val
 
@@ -39,29 +38,29 @@ def temp_split(df, n_train_semesters=5, semester_col="semestre"):
     lim = df[semester_col].drop_duplicates().nsmallest(n_train_semesters).max()
 
     df_train = df[df[semester_col] <= lim].reset_index(drop=True)
-    df_val   = df[df[semester_col] >  lim].reset_index(drop=True)
+    df_val = df[df[semester_col] >  lim].reset_index(drop=True)
 
     return df_train, df_val
 
 def random_kfold(df, target_col, k=5, random_state=42):
 
-    rng = np.random.default_rng(random_state) #ver bien el uso de esto 
+    rng = np.random.default_rng(random_state) #generador local de numeros aleatorios
     classes = df[target_col].unique()
     folds = [[] for _ in range(k)]
 
     for cls in classes:
         cls_idx = df[df[target_col] == cls].index.to_numpy()
         cls_idx = rng.permutation(cls_idx)
-        splits  = np.array_split(cls_idx, k)
+        splits = np.array_split(cls_idx, k)
         for i, split in enumerate(splits):
             folds[i].extend(split.tolist())
 
     result = []
     for i in range(k):
-        val_idx   = np.array(folds[i])
+        val_idx = np.array(folds[i])
         train_idx = np.concatenate([np.array(folds[j]) for j in range(k) if j != i])
-        df_train  = df.loc[train_idx].reset_index(drop=True)
-        df_val    = df.loc[val_idx].reset_index(drop=True)
+        df_train = df.loc[train_idx].reset_index(drop=True)
+        df_val = df.loc[val_idx].reset_index(drop=True)
         result.append((df_train, df_val))
 
     return result
@@ -79,7 +78,6 @@ def group_kfold(df, k=8):
         result.append((df_train, df_val, list(val_group)))
 
     return result 
-
 
 
 def cv_lambda_random(df, feature_cols, target_col, feats_imp, exclude, lambdas, k=5, random_state=42):
@@ -101,7 +99,7 @@ def cv_lambda_random(df, feature_cols, target_col, feats_imp, exclude, lambdas, 
 
             model = mdls.LogRegressionL2(lam=lam)
             model.set_model(X_train, y_train)
-            y_pred  = model.predict(X_val)
+            y_pred = model.predict(X_val)
 
             f1_folds.append(mtr.f1(y_val, y_pred))
 
@@ -140,8 +138,8 @@ def cv_lambda_group(df, feature_cols, target_col, feats_imp, exclude, lambdas, k
 def plot_lambda_search(lambdas, f1_random, f1_group, f1_temporal):
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(lambdas, f1_random,   label="Random KFold",  marker='o', markersize=3)
-    ax.plot(lambdas, f1_group,    label="Group KFold",   marker='o', markersize=3)
+    ax.plot(lambdas, f1_random, label="Random KFold", marker='o', markersize=3)
+    ax.plot(lambdas, f1_group, label="Group KFold", marker='o', markersize=3)
     ax.axhline(f1_temporal.max(), linestyle='--', label=f"Temporal (best={f1_temporal.max():.3f})")
     ax.set_xscale("log")
     ax.set_xlabel("λ")
@@ -152,7 +150,7 @@ def plot_lambda_search(lambdas, f1_random, f1_group, f1_temporal):
     plt.show()
 
 def cv_coeficientes_random(df, feature_cols, target_col, feats_imp, exclude, lam, k=5):
-    folds = random_kfold(df, target_col=target_col, k=k)  # df, no indices
+    folds = random_kfold(df, target_col=target_col, k=k)  
     coefs = []
 
     for df_train, df_val in folds:
@@ -163,13 +161,13 @@ def cv_coeficientes_random(df, feature_cols, target_col, feats_imp, exclude, lam
 
         model = mdls.LogRegressionL2(lam=lam)
         model.set_model(X_train, y_train)
-        coefs.append(model.weights.copy())  # weights, no coef_
+        coefs.append(model.weights.copy())  
 
-    return np.array(coefs)  # shape (k, n_features)
+    return np.array(coefs)  
 
 
 def cv_coeficientes_group(df, feature_cols, target_col, feats_imp, exclude, lam, k=8):
-    folds = group_kfold(df, k=k)  # df, no groups
+    folds = group_kfold(df, k=k)
     coefs = []
 
     for df_train, df_val, _ in folds:  
@@ -196,7 +194,7 @@ def cv_group_multiclass(df, feature_cols, target_col, feats_imp, exclude, model_
     all_true = []
 
     for df_train, df_val, _ in folds:
-        # Preprocesamiento dentro del fold
+        # preprocesamiento dentro del fold
         df_train, df_val = utls.pipeline(df_train, df_val, feats_imp, exclude)
 
         X_train = df_train[feature_cols].values
@@ -216,55 +214,12 @@ def cv_group_multiclass(df, feature_cols, target_col, feats_imp, exclude, model_
 
     return y_true, y_pred, y_prob
 
-"""
-def cv_rf_hyperparams(df, feature_cols, target_col, feats_imp, exclude, param_grid, k=8):
-    folds = group_kfold(df, k=k)
 
-    keys         = list(param_grid.keys())
-    values       = list(param_grid.values())
-    combinations = list(itertools.product(*values))
-
-    results = []
-
-    for combo in combinations:
-        params   = dict(zip(keys, combo))
-        f1_folds = []
-
-        for df_train, df_val, _ in folds:
-            meds     = prep.medians(df_train, feats_imp)
-            df_train = prep.impute(df_train, meds, feats_imp)
-            df_val   = prep.impute(df_val,   meds, feats_imp)
-            p        = prep.params_norm(df_train, exclude)
-            df_train = prep.normalize_df(df_train, p)
-            df_val   = prep.normalize_df(df_val,   p)
-
-            X_train = df_train[feature_cols].values
-            y_train = df_train[target_col].values
-            X_val   = df_val[feature_cols].values
-            y_val   = df_val[target_col].values
-
-            model  = mdls.RandomForest(**params)
-            model.set_model(X_train, y_train)
-            y_pred = model.predict(X_val)
-
-            f1_macro = np.mean([
-                mtr.f1((y_val == k).astype(int), (y_pred == k).astype(int))
-                for k in np.unique(y_train)
-            ])
-            f1_folds.append(f1_macro)
-
-        results.append({**params, "f1_macro": np.mean(f1_folds)})
-        print(f"  {params} → F1 macro: {np.mean(f1_folds):.4f}")
-
-    results = sorted(results, key=lambda x: x["f1_macro"], reverse=True)
-    return results
-
-"""
 
 def cv_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lam, rebalanceo_fn=None, k=8, reweight = False):
     folds  = group_kfold(df, k=k)
     all_preds = []
-    all_probas = []
+    all_probs = []
     all_true = []
 
     for df_train, df_val, _ in folds:
@@ -294,10 +249,10 @@ def cv_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lam, rebalan
             model.set_model(X_train, y_train)
 
         all_preds.append(model.predict(X_val))
-        all_probas.append(model.predict_prob(X_val))
+        all_probs.append(model.predict_prob(X_val))
         all_true.append(y_val)
 
-    return np.concatenate(all_true), np.concatenate(all_preds), np.concatenate(all_probas)
+    return np.concatenate(all_true), np.concatenate(all_preds), np.concatenate(all_probs)
 
 def cv_lambda_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lambdas, rebalanceo_fn=None, reweight=False, k=8):
 
@@ -335,5 +290,4 @@ def cv_lambda_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lambd
         f1_lambdas.append(np.mean(f1_folds))
 
     return np.array(f1_lambdas)
-
 
