@@ -253,11 +253,12 @@ class DecisionTree:
 
 
 class RandomForest:
-    def __init__(self, n_estimators=30, max_depth=12, min_samples_leaf=10, max_features=6):
+    def __init__(self, n_estimators=30, max_depth=12, min_samples_leaf=10, max_features=6, random_state = 42):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
         self.max_features = max_features
+        self.random_state = random_state 
         self.trees = []
         self.classes = None
 
@@ -266,9 +267,11 @@ class RandomForest:
         n_feats = self.max_features or int(np.sqrt(X.shape[1]))
         self.trees = []
 
+        rng = np.random.RandomState(self.random_state)
+
         for _ in range(self.n_estimators):
             #Bootstrap: cada arbol ve aporx 63% de los datos
-            idx = np.random.choice(len(y), size=len(y), replace=True)
+            idx = rng.choice(len(y), size=len(y), replace=True) 
             X_b = X[idx]
             y_b = y[idx]
 
