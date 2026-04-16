@@ -285,7 +285,7 @@ def cv_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lam, rebalan
 
             c1 = y_train.mean()      
             c2 = 1 - c1               
-            C = c2 / c1
+            C = c1 / c2
 
             w = np.where(y_train == 0, C, 1.0)
             model.set_model(X_train, y_train, w=w)
@@ -298,3 +298,42 @@ def cv_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lam, rebalan
         all_true.append(y_val)
 
     return np.concatenate(all_true), np.concatenate(all_preds), np.concatenate(all_probas)
+
+def cv_lambda_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lambdas, rebalanceo_fn=None, reweight=False, k=8):
+
+    folds = group_kfold(df, k=k)
+    f1_lambdas = []
+
+    for lam in lambdas:
+        f1_folds = []
+
+        for df_train, df_val, _ in folds:
+            df_train, df_val = utls.pipeline(df_train, df_val, feats_imp, exclude)
+
+            X_train = df_train[feature_cols].values
+            y_train = df_train[target_col].values
+            X_val = df_val[feature_cols].values
+            y_val = df_val[target_col].values
+
+            model = mdls.LogRegressionL2(lam=lam)
+
+            if rebalanceo_fn is not None:
+                X_train, y_train = rebalanceo_fn(X_train, y_train)
+                model.set_model(X_train, y_train)
+            if reweight:
+                c1 = y_train.mean()
+                c2 = 1 - c1
+                C = c1 / c2
+                w = np.where(y_train == 0, C, 1.0)
+                model.set_model(X_train, y_train, w=w)
+            else:
+                model.set_model(X_train, y_train)
+
+            y_pred = model.predict(X_val)
+            f1_folds.append(mtr.f1(y_val, y_pred))
+
+        f1_lambdas.append(np.mean(f1_folds))
+
+    return np.array(f1_lambdas)
+
+

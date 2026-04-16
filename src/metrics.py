@@ -34,11 +34,18 @@ def roc_curve(y_true, y_proba):
         FN = np.sum((y_pred == 0) & (y_true == 1))
         tprs.append(TP / (TP + FN) if (TP + FN) > 0 else 0.0)
         fprs.append(FP / (FP + TN) if (FP + TN) > 0 else 0.0)
-    return np.array(fprs), np.array(tprs)
+    
+    fprs, tprs = np.array(fprs), np.array(tprs)
+    orden = np.argsort(fprs)
+    fprs, tprs = fprs[orden], tprs[orden]
+    auc_val = np.trapz(tprs, fprs)
+    return fprs, tprs, auc_val
 
+"""
 def auc(x, y):
     order = np.argsort(x)
     return np.trapz(y[order], x[order])
+"""
 
 def precision_recall_curve(y_true, y_proba):
     thresholds = np.linspace(0, 1, 200)
@@ -93,13 +100,14 @@ def f1(y_true, y_pred):
     return 2 * p * r / (p + r) if (p + r) > 0 else 0.0
 
 def auc_roc(y_true, y_proba):
-    fprs, tprs = roc_curve(y_true, y_proba)
-    return auc(fprs, tprs)  # integra tpr sobre fpr
+    fprs, tprs, auc = roc_curve(y_true, y_proba)
+    return auc  # integra tpr sobre fpr
 
 
 def auc_pr(y_true, y_proba):
-    precs, recs = precision_recall_curve(y_true, y_proba)
-    return auc(recs, precs)  # integra precision sobre recall
+    precs, recs, auc = precision_recall_curve(y_true, y_proba)
+    return auc  # integra precision sobre recall
+
 
 
 """
@@ -131,7 +139,7 @@ def plot_pr(y_true, y_proba, title='', ax=None):
     ax.legend()
     return ax
 
-
+    """
 def compute_metrics(y_true, y_pred, y_proba):
     return {
         "accuracy": accuracy(y_true, y_pred),
@@ -155,5 +163,5 @@ def compute_metrics_multiclass(y_true, y_pred, y_proba):
 
     return metrics
 
-    """
+
 

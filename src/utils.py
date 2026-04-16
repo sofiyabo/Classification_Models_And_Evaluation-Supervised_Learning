@@ -116,7 +116,7 @@ def plot_school_analysis(df, feats_numericas, label_rend, label_sem):
     plt.tight_layout()
     plt.show()
 
-
+"""
 def cv(folds, model_fn, preprocess_fn, metrics_fn):
     all_metrics = []
 
@@ -129,7 +129,8 @@ def cv(folds, model_fn, preprocess_fn, metrics_fn):
         all_metrics.append(metrics)
 
     return all_metrics
-
+"""
+    
 def matrices(df, feature_cols, target):
     
     X = df[feature_cols].values
@@ -205,7 +206,7 @@ def plot_roc_multiclass(y_true, y_proba, classes, class_names, title="ROC Multic
     fig, axes = plt.subplots(1, len(classes), figsize=(5 * len(classes), 4))
     
     for ax, k in zip(axes, classes):
-        y_true_k  = (y_true == k).astype(int)
+        y_true_k = (y_true == k).astype(int)
         y_proba_k = y_proba[:, k]
         
         fpr, tpr, auc= mtr.roc_curve(y_true_k, y_proba_k)
