@@ -171,10 +171,7 @@ def cv_coeficientes_group(df, feature_cols, target_col, feats_imp, exclude, lam,
     coefs = []
 
     for df_train, df_val, _ in folds:  
-        meds = prep.medians(df_train, feats_imp)
-        df_train = prep.impute(df_train, meds, feats_imp)
-        params = prep.params_norm(df_train, exclude)
-        df_train = prep.normalize_df(df_train, params)
+        df_train, df_val = utls.pipeline(df_train, df_val, feats_imp, exclude)
 
         X_train = df_train[feature_cols].values
         y_train = df_train[target_col].values
@@ -238,9 +235,9 @@ def cv_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lam, rebalan
 
         elif reweight:
 
-            c1 = y_train.mean()      
-            c2 = 1 - c1               
-            C = c1 / c2
+            c2 = y_train.mean()      
+            c1 = 1 - c2               
+            C = c2 / c1
 
             w = np.where(y_train == 0, C, 1.0)
             model.set_model(X_train, y_train, w=w)
@@ -275,10 +272,10 @@ def cv_lambda_rebalanceo(df, feature_cols, target_col, feats_imp, exclude, lambd
             if rebalanceo_fn is not None:
                 X_train, y_train = rebalanceo_fn(X_train, y_train)
                 model.set_model(X_train, y_train)
-            if reweight:
-                c1 = y_train.mean()
-                c2 = 1 - c1
-                C = c1 / c2
+            elif reweight:
+                c2 = y_train.mean()
+                c1 = 1 - c2
+                C = c2 / c1
                 w = np.where(y_train == 0, C, 1.0)
                 model.set_model(X_train, y_train, w=w)
             else:
