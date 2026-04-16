@@ -270,7 +270,7 @@ class RandomForest:
         rng = np.random.RandomState(self.random_state)
 
         for _ in range(self.n_estimators):
-            #Bootstrap: cada arbol ve aporx 63% de los datos
+            #bootstrap: cada arbol ve aporx 63% de los datos
             idx = rng.choice(len(y), size=len(y), replace=True) 
             X_b = X[idx]
             y_b = y[idx]
