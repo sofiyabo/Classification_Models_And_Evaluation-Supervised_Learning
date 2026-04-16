@@ -321,4 +321,3 @@ class RandomForest:
         importances[node["feat"]] += node["gain"] * (node["n_samples"] / n_samples)
         self._compute_importance(node["left"],  importances, n_samples)
         self._compute_importance(node["right"], importances, n_samples)
-
