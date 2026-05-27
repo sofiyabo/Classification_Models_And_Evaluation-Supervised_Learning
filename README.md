@@ -23,3 +23,21 @@ This notebook covers the full workflow for classification problems:
 - Evaluation metrics: accuracy, precision, recall, F1-score
 - Confusion matrix analysis
 - Overfitting detection and mitigation
+
+## Project Structure
+
+```
+├── data/
+│   └── raw/                  # Raw input data
+├── notebooks/                # Jupyter notebooks
+├── src/
+│   ├── data_splitting.py     # Train/test split logic
+│   ├── metrics.py            # Evaluation metrics
+│   ├── models.py             # Model definitions
+│   ├── preprocessing.py      # Data preprocessing pipeline
+│   └── utils.py              # Helper functions
+└── README.md
+```
+
+*Part of the Machine Learning and Deep Learning coursework — AI Engineering, Universidad de San Andrés.*
+
